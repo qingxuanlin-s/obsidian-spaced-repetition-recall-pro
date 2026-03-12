@@ -74,10 +74,12 @@ export class ReviewQueueListView extends ItemView {
             ).getElementsByClassName("tree-item-children nav-folder-children")[0] as HTMLElement;
 
             if (deck.newNotes.length > 0) {
+                const shouldExpandNewNotesFolder: boolean =
+                    deck.activeFolders.has(t("NEW")) || !deckCollapsed;
                 const newNotesFolderEl: HTMLElement = this.createRightPaneFolder(
                     deckFolderEl,
                     t("NEW"),
-                    !deck.activeFolders.has(t("NEW")),
+                    !shouldExpandNewNotesFolder,
                     deckCollapsed,
                     deck,
                 );
@@ -97,7 +99,7 @@ export class ReviewQueueListView extends ItemView {
                         newNotesFolderEl,
                         newFile,
                         fileIsOpen,
-                        !deck.activeFolders.has(t("NEW")),
+                        !shouldExpandNewNotesFolder,
                         deck,
                         this.plugin,
                     );
@@ -212,6 +214,7 @@ export class ReviewQueueListView extends ItemView {
 
         collapseIconEl.innerHTML = COLLAPSE_ICON;
         this.changeFolderFolding(folderEl, collapsed);
+        childrenEl.style.display = collapsed ? "none" : "block";
 
         folderTitleEl.createDiv("tree-item-inner nav-folder-title-content").setText(folderTitle);
 
