@@ -100,6 +100,7 @@ const DEFAULT_DATA: PluginData = {
 
 export default class SRPlugin extends Plugin {
     private isSRInFocus: boolean = false;
+    private relevantFileChangeRefreshTimer: number | null = null;
     private statusBar: HTMLElement;
     private reviewQueueView: ReviewQueueListView;
     public data: PluginData;
@@ -657,7 +658,7 @@ export default class SRPlugin extends Plugin {
 
         this.updateStatusBar();
 
-        if (this.getActiveLeaf(REVIEW_QUEUE_VIEW_TYPE)) this.reviewQueueView.redraw();
+        this.refreshReviewQueueViewIfOpen();
     }
 
     async loadNote(noteFile: TFile): Promise<Note> {
@@ -1172,5 +1173,85 @@ export default class SRPlugin extends Plugin {
 
     public getSRInFocusState(): boolean {
         return this.isSRInFocus;
+    }
+
+    public scheduleRefreshForRelevantFileChange(file: TAbstractFile): void {
+        if (!(file instanceof TFile) || file.extension !== "md") {
+            return;
+        }
+
+        if (!this.isRelevantMarkdownFile(file)) {
+            return;
+        }
+
+        this.scheduleRelevantFileChangeRefresh();
+    }
+
+    public scheduleRefreshAfterMarkdownDelete(file: TAbstractFile): void {
+        if (file instanceof TFile && file.extension === "md") {
+            this.scheduleRelevantFileChangeRefresh();
+        }
+    }
+
+    public scheduleRefreshAfterMarkdownMetadataChange(file: TAbstractFile): void {
+        if (!(file instanceof TFile) || file.extension !== "md") {
+            return;
+        }
+
+        if (SettingsUtil.isPathInNoteIgnoreFolder(this.data.settings, file.path)) {
+            return;
+        }
+
+        this.scheduleRelevantFileChangeRefresh();
+    }
+
+    private scheduleRelevantFileChangeRefresh(): void {
+        if (this.relevantFileChangeRefreshTimer !== null) {
+            window.clearTimeout(this.relevantFileChangeRefreshTimer);
+        }
+
+        this.relevantFileChangeRefreshTimer = window.setTimeout(async () => {
+            this.relevantFileChangeRefreshTimer = null;
+
+            if (this.syncLock) {
+                this.scheduleRelevantFileChangeRefresh();
+                return;
+            }
+
+            await this.sync();
+            this.refreshReviewQueueViewIfOpen();
+            await this.tabViewManager.refreshVisibleDeckTabs();
+        }, 500);
+    }
+
+    private isRelevantMarkdownFile(file: TFile): boolean {
+        const settings = this.data.settings;
+        if (SettingsUtil.isPathInNoteIgnoreFolder(settings, file.path)) {
+            return false;
+        }
+
+        const fileCachedData = this.app.metadataCache.getFileCache(file) || {};
+        const tags = getAllTags(fileCachedData) || [];
+        const isIgnoredTag = settings.tagsToIgnore.some((ignoreTag) =>
+            tags.some((noteTag) => noteTag.startsWith(ignoreTag)),
+        );
+
+        if (isIgnoredTag) {
+            return false;
+        }
+
+        return (
+            SettingsUtil.isAnyTagANoteReviewTag(settings, tags) ||
+            tags.some((tag) => SettingsUtil.isFlashcardTag(settings, tag))
+        );
+    }
+
+    private refreshReviewQueueViewIfOpen(): void {
+        if (
+            this.reviewQueueView &&
+            this.app.workspace.getLeavesOfType(REVIEW_QUEUE_VIEW_TYPE).length > 0
+        ) {
+            this.reviewQueueView.redraw();
+        }
     }
 }

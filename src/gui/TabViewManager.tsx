@@ -102,6 +102,17 @@ export default class TabViewManager {
         });
     }
 
+    public async refreshVisibleDeckTabs(): Promise<void> {
+        const leaves = this.plugin.app.workspace.getLeavesOfType(SR_TAB_VIEW);
+        await Promise.all(
+            leaves.map(async (leaf) => {
+                if (leaf.view instanceof TabView) {
+                    await leaf.view.refreshDecksIfVisible();
+                }
+            }),
+        );
+    }
+
     public forEachTabViewType(callback: (type: TabViewType) => void) {
         this.tabViewTypes.forEach((type) => callback(type));
     }

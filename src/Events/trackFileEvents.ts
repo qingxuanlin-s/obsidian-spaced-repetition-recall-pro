@@ -12,6 +12,8 @@ export function registerTrackFileEvents(plugin: SRPlugin) {
                 trackFile.rename(file.path);
                 await plugin.store.save();
             }
+
+            plugin.scheduleRefreshForRelevantFileChange(file);
         }),
     );
 
@@ -19,11 +21,14 @@ export function registerTrackFileEvents(plugin: SRPlugin) {
         plugin.app.vault.on("delete", (file) => {
             plugin.store.untrackFile(file.path);
             plugin.store.save();
+            plugin.scheduleRefreshAfterMarkdownDelete(file);
         }),
     );
 
     plugin.registerEvent(
         plugin.app.vault.on("modify", async (file: TFile) => {
+            plugin.scheduleRefreshAfterMarkdownMetadataChange(file);
+
             if (file.extension === "md") {
                 if (plugin.data.settings.dataLocation === DataLocation.SaveOnNoteFile) {
                     return;
@@ -37,6 +42,18 @@ export function registerTrackFileEvents(plugin: SRPlugin) {
                     trackFile.syncNoteCardsIndex(fileText, plugin.data.settings);
                 }
             }
+        }),
+    );
+
+    plugin.registerEvent(
+        plugin.app.vault.on("create", (file) => {
+            plugin.scheduleRefreshForRelevantFileChange(file);
+        }),
+    );
+
+    plugin.registerEvent(
+        plugin.app.metadataCache.on("changed", (file) => {
+            plugin.scheduleRefreshAfterMarkdownMetadataChange(file);
         }),
     );
 }

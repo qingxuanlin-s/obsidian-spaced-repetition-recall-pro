@@ -89,6 +89,14 @@ export class CardUI {
         this.init();
     }
 
+    public setReviewSequencer(
+        reviewSequencer: IFlashcardReviewSequencer,
+        reviewMode: FlashcardReviewMode,
+    ): void {
+        this.reviewSequencer = reviewSequencer;
+        this.reviewMode = reviewMode;
+    }
+
     /**
      * Initializes all static elements in the FlashcardView
      */

@@ -46,6 +46,14 @@ export class DeckUI {
         this.init();
     }
 
+    public setReviewSequencer(reviewSequencer: IFlashcardReviewSequencer): void {
+        this.reviewSequencer = reviewSequencer;
+    }
+
+    public isVisible(): boolean {
+        return !this.view.hasClass("sr-is-hidden");
+    }
+
     /**
      * Initializes all static elements in the DeckListView
      */

@@ -40,6 +40,7 @@ export class TabView extends ItemView {
     private deckView: DeckUI;
     private flashcardView: CardUI;
     private openErrorCount: number = 0; // Counter for catching the first inevitable error but the letting the other through
+    private isRefreshingDecksOnFocus: boolean = false;
 
     constructor(
         leaf: WorkspaceLeaf,
@@ -53,6 +54,24 @@ export class TabView extends ItemView {
         this.plugin = plugin;
         this.settings = plugin.data.settings;
         this.loadReviewSequencerData = loadReviewSequencerData;
+        this.registerEvent(
+            this.app.workspace.on("active-leaf-change", async (leaf) => {
+                if (leaf !== this.leaf || !this.deckView?.isVisible() || this.isRefreshingDecksOnFocus) {
+                    return;
+                }
+
+                this.isRefreshingDecksOnFocus = true;
+                try {
+                    if (!this.plugin.syncLock) {
+                        await this.plugin.sync();
+                    }
+                    await this._reloadReviewSequencerData();
+                    this._showDecksList();
+                } finally {
+                    this.isRefreshingDecksOnFocus = false;
+                }
+            }),
+        );
 
         const viewContent = this.containerEl.getElementsByClassName("view-content");
         if (viewContent.length > 0) {
@@ -104,10 +123,7 @@ export class TabView extends ItemView {
      */
     async onOpen() {
         try {
-            const loadedData = await this.loadReviewSequencerData();
-
-            this.reviewSequencer = loadedData.reviewSequencer;
-            this.reviewMode = loadedData.mode;
+            await this._reloadReviewSequencerData();
 
             if (this.deckView === undefined) {
                 // Init static elements in views
@@ -158,6 +174,29 @@ export class TabView extends ItemView {
     async onClose() {
         if (this.deckView) this.deckView.close();
         if (this.flashcardView) this.flashcardView.close();
+    }
+
+    public async refreshDecksIfVisible(): Promise<void> {
+        if (!this.deckView?.isVisible() || this.isRefreshingDecksOnFocus) {
+            return;
+        }
+
+        this.isRefreshingDecksOnFocus = true;
+        try {
+            await this._reloadReviewSequencerData();
+            this._showDecksList();
+        } finally {
+            this.isRefreshingDecksOnFocus = false;
+        }
+    }
+
+    private async _reloadReviewSequencerData(): Promise<void> {
+        const loadedData = await this.loadReviewSequencerData();
+
+        this.reviewSequencer = loadedData.reviewSequencer;
+        this.reviewMode = loadedData.mode;
+        this.deckView?.setReviewSequencer(this.reviewSequencer);
+        this.flashcardView?.setReviewSequencer(this.reviewSequencer, this.reviewMode);
     }
 
     private _showDecksList(): void {
